@@ -32,35 +32,49 @@ export function RecordTable({
 
   const activeCols = sheet.columns.filter((c) => !c.archived);
   const allRows = workspace.rowsBySheet[sheet.id] ?? [];
+
+  // Default ordering: newest first by the sheet's first date column, falling
+  // back to insertion order. Insertion order encodes creation order, so it also
+  // serves as the same-day tiebreaker — most recently added stays on top.
+  const firstDateCol = activeCols.find((c) => c.type === 'date');
+  const defaultSort: SortState | null = firstDateCol ? { key: firstDateCol.id, dir: 'desc' } : null;
+  const activeSort = sort && activeCols.some((c) => c.id === sort.key) ? sort : defaultSort;
+  const insertionIndex = new Map(allRows.map((r, i) => [r.id, i]));
+
   const filtered = search
     ? allRows.filter((r) =>
         activeCols.some((c) => String(r.cells[c.id] ?? '').toLowerCase().includes(search.toLowerCase()))
       )
     : allRows;
 
-  const rows = sort
-    ? [...filtered].sort((a, b) => {
-        const dir = sort.dir === 'asc' ? 1 : -1;
-        const col = activeCols.find((c) => c.id === sort.key);
-        if (!col) return 0;
-        const va = a.cells[col.id];
-        const vb = b.cells[col.id];
-        if (va == null && vb == null) return 0;
-        if (va == null) return dir;
-        if (vb == null) return -dir;
-        if (col.type === 'number') return dir * (Number(va) - Number(vb));
-        return dir * String(va).localeCompare(String(vb));
-      })
-    : filtered;
+  const rows = [...filtered].sort((a, b) => {
+    const col = activeSort ? activeCols.find((c) => c.id === activeSort.key) : undefined;
+    if (activeSort && col) {
+      const dir = activeSort.dir === 'asc' ? 1 : -1;
+      const va = a.cells[col.id];
+      const vb = b.cells[col.id];
+      if (va == null && vb != null) return dir;
+      if (vb == null && va != null) return -dir;
+      if (va != null && vb != null) {
+        const cmp = col.type === 'number'
+          ? Number(va) - Number(vb)
+          : String(va).localeCompare(String(vb));
+        if (cmp !== 0) return dir * cmp;
+      }
+    }
+    // Tiebreaker (and fallback when no date column): most recently added first.
+    return (insertionIndex.get(b.id) ?? 0) - (insertionIndex.get(a.id) ?? 0);
+  });
 
   const kpis = getSheetKpis(workspace, sheet);
 
   const toggleSort = (key: string) => {
-    setSort((prev) =>
-      prev?.key === key
-        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { key, dir: 'asc' }
-    );
+    setSort((prev) => {
+      const cur = prev && activeCols.some((c) => c.id === prev.key) ? prev : defaultSort;
+      return cur?.key === key
+        ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'asc' };
+    });
   };
 
   const getWidth = (colId: string) =>
@@ -134,7 +148,7 @@ export function RecordTable({
                   <ColumnHeaderWithTooltip
                     columnId={col.id}
                     label={col.label}
-                    sort={sort ?? undefined}
+                    sort={activeSort ?? undefined}
                     onSort={toggleSort}
                     resizable
                     onResizeStart={(e) => handleResizeStart(col.id, e)}

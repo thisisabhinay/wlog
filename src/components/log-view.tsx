@@ -9,15 +9,17 @@ import {
 } from '#components/ui/popover';
 import { useDoc } from '#store/use-doc';
 import { commands } from '#domain/commands';
+import { formatUnit } from '#domain/starter';
 import { EmptyState } from '#components/empty-state';
 import { ColumnHeaderWithTooltip } from '#components/column-header-tooltip';
 import type { MetricId, EventId } from '#domain/schema';
 
 const LOG_COLUMNS = [
-  { id: 'log_date', label: 'Date', width: '15%' },
-  { id: 'log_metric', label: 'Metric', width: '35%' },
-  { id: 'log_value', label: 'Value', width: '15%' },
-  { id: 'log_note', label: 'Note', width: '30%' },
+  { id: 'log_date', label: 'Date', width: '14%' },
+  { id: 'log_metric', label: 'Metric', width: '32%' },
+  { id: 'log_value', label: 'Value', width: '10%' },
+  { id: 'log_unit', label: 'Unit', width: '16%' },
+  { id: 'log_note', label: 'Note', width: '23%' },
 ] as const;
 
 export function LogView({ search, onAdd }: { search: string; onAdd: () => void }) {
@@ -33,14 +35,22 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
         const metric = getMetric(e.metric);
         return (
           metric?.label.toLowerCase().includes(search.toLowerCase()) ||
-          String(e.value).includes(search) ||
+          String(e.value ?? '').includes(search) ||
           e.note?.toLowerCase().includes(search.toLowerCase()) ||
           e.date.includes(search)
         );
       })
     : entries;
 
-  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+  // Newest date first; ties broken by insertion order so the most recently
+  // added entry sits on top within the same day (no timestamp needed —
+  // array order already encodes when each entry was logged).
+  const insertionIndex = new Map(workspace.log.map((e, i) => [e.id, i]));
+  const sorted = [...filtered].sort((a, b) => {
+    const byDate = b.date.localeCompare(a.date);
+    if (byDate !== 0) return byDate;
+    return (insertionIndex.get(b.id) ?? 0) - (insertionIndex.get(a.id) ?? 0);
+  });
 
   const handleEditField = (
     eId: EventId,
@@ -110,12 +120,26 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
                     <input
                       type="number"
                       step="any"
-                      className="w-full px-2 py-1.5 text-sm bg-transparent outline-none tabular-nums"
-                      value={event.value}
+                      placeholder="—"
+                      className="w-full px-2 py-1.5 text-sm bg-transparent outline-none tabular-nums placeholder:text-muted-foreground"
+                      value={event.value ?? ''}
                       onChange={(e) =>
-                        handleEditField(event.id as EventId, 'value', event, parseFloat(e.target.value) || 0)
+                        handleEditField(
+                          event.id as EventId,
+                          'value',
+                          event,
+                          e.target.value === '' ? null : parseFloat(e.target.value),
+                        )
                       }
                     />
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5">
+                    <span
+                      className="text-sm text-muted-foreground"
+                      title={getMetric(event.metric)?.description}
+                    >
+                      {formatUnit(getMetric(event.metric)?.unit)}
+                    </span>
                   </TableCell>
                   <TableCell className="p-0">
                     <input
@@ -152,7 +176,7 @@ function MetricPicker({
   onChange,
 }: {
   value: MetricId;
-  metrics: { id: MetricId; label: string; sheetId: string; agg: string }[];
+  metrics: { id: MetricId; label: string; sheetId: string; agg: string; unit?: string; description?: string }[];
   onChange: (id: MetricId) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -171,9 +195,12 @@ function MetricPicker({
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setFilter(''); }}>
       <PopoverTrigger
         className="w-full px-2 py-1 text-sm text-left flex items-center gap-1 cursor-pointer hover:bg-accent/50 transition-colors"
+        title={selected?.description}
       >
         <div className="flex-1 min-w-0">
-          <span className="block truncate">{selected?.label ?? String(value)}</span>
+          <span className={`block truncate ${selected ? '' : 'text-muted-foreground'}`}>
+            {selected?.label ?? 'Select metric…'}
+          </span>
           {selectedSheet && (
             <span className="block text-[11px] text-muted-foreground truncate leading-tight">
               {selectedSheet.name} → {selected?.agg === 'avg' ? 'monthly average' : 'monthly total'}
@@ -206,10 +233,18 @@ function MetricPicker({
                 className={`w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-accent transition-colors ${m.id === value ? 'bg-accent' : ''}`}
                 onClick={() => { onChange(m.id); setOpen(false); setFilter(''); }}
               >
-                <span className="block truncate">{m.label}</span>
+                <span className="block truncate">
+                  {m.label}
+                  {m.unit && <span className="text-muted-foreground font-normal"> · {formatUnit(m.unit)}</span>}
+                </span>
                 <span className="block text-[11px] text-muted-foreground truncate">
                   {sheet?.name} → {m.agg === 'avg' ? 'monthly average' : 'monthly total'}
                 </span>
+                {m.description && (
+                  <span className="block text-[11px] text-muted-foreground/80 leading-snug mt-0.5 line-clamp-2">
+                    {m.description}
+                  </span>
+                )}
               </button>
             );
           })}

@@ -32,6 +32,51 @@ function col(id: string, label: string, type: ColumnDef['type'], opts?: Partial<
   return { id: cid(id), label, type, required: false, archived: false, ...opts };
 }
 
+/**
+ * Canonical, human-readable unit + plain-English description for each starter
+ * metric, keyed by metric id. Sourced here so both the starter templates and
+ * the persistence migration stay in sync. Units are spelled out (e.g.
+ * "seconds" not "s") so they read clearly in the standalone Unit column.
+ */
+export const METRIC_META: Record<string, { unit: string; description: string }> = {
+  m_lcp: { unit: 'seconds', description: 'Largest Contentful Paint — time until the main content is visible. Lower is faster.' },
+  m_inp: { unit: 'milliseconds', description: 'Interaction to Next Paint — how quickly the UI responds to input. Lower is snappier.' },
+  m_cls: { unit: 'score (0–1)', description: 'Cumulative Layout Shift — how much the page visually jumps while loading. 0 is rock-steady.' },
+  m_jsbndl: { unit: 'KB (gzipped)', description: 'Size of the JavaScript bundle shipped to the browser, gzipped.' },
+  m_crash: { unit: 'percent', description: 'Share of user sessions that finished without a crash.' },
+  m_jserr: { unit: 'percent', description: 'Share of sessions that hit an uncaught JavaScript error.' },
+  m_a11y: { unit: 'score (0–100)', description: 'Accessibility audit score, e.g. Lighthouse. Higher is more accessible.' },
+  m_testcv: { unit: 'percent', description: 'Percentage of code exercised by automated tests.' },
+  m_cibld: { unit: 'minutes', description: 'Wall-clock time for the CI pipeline to finish a build.' },
+  m_prlat: { unit: 'hours', description: 'Median time from a pull request opening to its first review.' },
+  m_prrev: { unit: 'PRs / month', description: 'Pull requests you reviewed this month.' },
+  m_prmrg: { unit: 'PRs / month', description: 'Your pull requests merged or shipped this month.' },
+  m_rfcs: { unit: 'docs / month', description: 'Design docs or RFCs you authored this month.' },
+  m_incid: { unit: 'count / month', description: 'Incidents or on-call pages you handled this month.' },
+  m_mentr: { unit: 'people / month', description: 'People you mentored or onboarded this month.' },
+  m_talks: { unit: 'talks / month', description: 'Talks, demos, or brown-bag sessions you gave this month.' },
+  m_intrv: { unit: 'count / month', description: 'Interviews you conducted this month.' },
+  m_xteam: { unit: 'projects / month', description: 'Cross-team projects you shipped this month.' },
+};
+
+/** Backfill readable unit + description onto a metric from METRIC_META by id. */
+export function applyMetricMeta<T extends { id: string }>(metric: T): T {
+  const meta = METRIC_META[metric.id];
+  return meta ? { ...metric, unit: meta.unit, description: meta.description } : metric;
+}
+
+const UNIT_ALIASES: Record<string, string> = {
+  s: 'seconds', sec: 'seconds', ms: 'milliseconds',
+  h: 'hours', hr: 'hours', hrs: 'hours', min: 'minutes', m: 'minutes',
+  d: 'days', '%': 'percent', pct: 'percent', kb: 'KB', mb: 'MB',
+};
+
+/** Expand a cryptic unit abbreviation into a readable word for display. */
+export function formatUnit(unit?: string): string {
+  if (!unit) return '—';
+  return UNIT_ALIASES[unit.trim().toLowerCase()] ?? unit;
+}
+
 function currentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -134,7 +179,7 @@ function fullTemplate(): Pick<Workspace, 'sheets' | 'metrics' | 'rowsBySheet' | 
         ],
       },
     ],
-    metrics: [
+    metrics: ([
       { id: M.lcp, label: 'LCP (s)', sheetId: S.feHealth, agg: 'avg', direction: 'lower', target: 2.5, unit: 's', archived: false },
       { id: M.inp, label: 'INP (ms)', sheetId: S.feHealth, agg: 'avg', direction: 'lower', target: 200, unit: 'ms', archived: false },
       { id: M.cls, label: 'CLS', sheetId: S.feHealth, agg: 'avg', direction: 'lower', target: 0.1, archived: false },
@@ -153,7 +198,7 @@ function fullTemplate(): Pick<Workspace, 'sheets' | 'metrics' | 'rowsBySheet' | 
       { id: M.talks, label: 'Talks / demos / brown-bags', sheetId: S.headlines, agg: 'sum', archived: false },
       { id: M.interviews, label: 'Interviews conducted', sheetId: S.headlines, agg: 'sum', archived: false },
       { id: M.crossTeam, label: 'Cross-team projects shipped', sheetId: S.headlines, agg: 'sum', archived: false },
-    ],
+    ] as Workspace['metrics']).map(applyMetricMeta),
     rowsBySheet: {
       [S.commitments]: [
         {
@@ -236,13 +281,13 @@ function liteTemplate(): Pick<Workspace, 'sheets' | 'metrics' | 'rowsBySheet' | 
         metricIds: [M.prsReviewed, M.prsMerged, M.rfcs, M.mentored, M.crossTeam],
       },
     ],
-    metrics: [
+    metrics: ([
       { id: M.prsReviewed, label: 'PRs reviewed', sheetId: S.headlines, agg: 'sum', archived: false },
       { id: M.prsMerged, label: 'PRs merged / shipped', sheetId: S.headlines, agg: 'sum', archived: false },
       { id: M.rfcs, label: 'Design docs / RFCs authored', sheetId: S.headlines, agg: 'sum', archived: false },
       { id: M.mentored, label: 'People mentored / onboarded', sheetId: S.headlines, agg: 'sum', archived: false },
       { id: M.crossTeam, label: 'Cross-team projects shipped', sheetId: S.headlines, agg: 'sum', archived: false },
-    ],
+    ] as Workspace['metrics']).map(applyMetricMeta),
     rowsBySheet: {
       [S.commitments]: [],
       [S.impact]: [],

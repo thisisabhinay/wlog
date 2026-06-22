@@ -15,7 +15,18 @@ import {
 import { commands } from '#domain/commands';
 import { rowId } from '#domain/id';
 import { slugify } from '#lib/slugify';
-import type { SheetId } from '#domain/schema';
+import type { SheetId, ColumnDef } from '#domain/schema';
+
+/**
+ * Default cell value for a freshly added row: date columns pre-fill with today
+ * (the common case for logging activity), numbers stay empty, everything else
+ * blank — so a new row reads as "ready to fill in", not fake data.
+ */
+function defaultCellValue(type: ColumnDef['type']): string | null {
+  if (type === 'date') return new Date().toISOString().slice(0, 10);
+  if (type === 'number') return null;
+  return '';
+}
 
 const SHEET_DESCRIPTIONS: Record<string, string> = {
   sh_commit: "Track promises you've made, their deadlines, and delivery status to demonstrate reliability.",
@@ -62,7 +73,7 @@ export function SheetPage() {
     const activeCols = sheet.columns.filter((c) => !c.archived);
     const newRow = {
       id: rowId(),
-      cells: Object.fromEntries(activeCols.map((c) => [c.id, c.type === 'number' ? null : ''])),
+      cells: Object.fromEntries(activeCols.map((c) => [c.id, defaultCellValue(c.type)])),
     };
     run(commands.addRow(sheet.id as SheetId, newRow));
   };
@@ -71,7 +82,7 @@ export function SheetPage() {
     if (sheet.kind !== 'form') return;
     const newRow = {
       id: rowId(),
-      cells: Object.fromEntries(sheet.fields.map((f) => [f.id, f.type === 'number' ? null : ''])),
+      cells: Object.fromEntries(sheet.fields.map((f) => [f.id, defaultCellValue(f.type)])),
     };
     run(commands.addRow(sheet.id as SheetId, newRow));
   };

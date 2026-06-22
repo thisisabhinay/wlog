@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Doc, WorkspaceId, WorkspaceTemplate } from '#domain/schema';
 import type { Command } from '#domain/commands';
-import { createStarter, createWorkspaceFromTemplate } from '#domain/starter';
+import { createStarter, createWorkspaceFromTemplate, applyMetricMeta } from '#domain/starter';
 import { workspaceId as genWsId } from '#domain/id';
 
 interface UndoState {
@@ -212,33 +212,48 @@ export const useDocStore = create<DocState>()(
     {
       name: 'work-logbook',
       partialize: (state) => ({ doc: state.doc }),
-      version: 1,
+      version: 2,
       migrate: (persisted: unknown, version: number) => {
-        const state = persisted as Record<string, unknown>;
-        if (version === 0 && state?.doc) {
-          const doc = state.doc as Record<string, unknown>;
-          if ((doc.meta as Record<string, unknown>)?.schemaVersion === 1) {
-            const wsId = genWsId();
-            return {
-              doc: {
-                meta: { schemaVersion: 2, appVersion: '0.2.0' },
-                activeWorkspaceId: wsId,
-                workspaces: [{
-                  id: wsId,
-                  name: 'My Logbook',
-                  createdAt: new Date().toISOString(),
-                  template: 'full' as const,
-                  config: doc.config,
-                  sheets: doc.sheets,
-                  metrics: doc.metrics,
-                  rowsBySheet: doc.rowsBySheet,
-                  log: doc.log,
-                }],
-              },
-            };
-          }
+        let state = persisted as any;
+
+        // v0 → v1: lift a legacy single-doc into the multi-workspace structure.
+        if (version === 0 && state?.doc?.meta?.schemaVersion === 1) {
+          const doc = state.doc;
+          const wsId = genWsId();
+          state = {
+            doc: {
+              meta: { schemaVersion: 2, appVersion: '0.2.0' },
+              activeWorkspaceId: wsId,
+              workspaces: [{
+                id: wsId,
+                name: 'My Logbook',
+                createdAt: new Date().toISOString(),
+                template: 'full' as const,
+                config: doc.config,
+                sheets: doc.sheets,
+                metrics: doc.metrics,
+                rowsBySheet: doc.rowsBySheet,
+                log: doc.log,
+              }],
+            },
+          };
         }
-        return persisted;
+
+        // v1 → v2: backfill readable units + descriptions onto known metrics.
+        if (version < 2 && state?.doc?.workspaces) {
+          state = {
+            ...state,
+            doc: {
+              ...state.doc,
+              workspaces: state.doc.workspaces.map((ws: any) => ({
+                ...ws,
+                metrics: (ws.metrics ?? []).map(applyMetricMeta),
+              })),
+            },
+          };
+        }
+
+        return state;
       },
     }
   )

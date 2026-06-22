@@ -38,7 +38,8 @@ export const MetricDef = z.object({
   agg: AggType,
   direction: Direction.optional(),
   target: z.number().optional(),
-  unit: z.string().max(12).optional(),
+  unit: z.string().max(20).optional(),
+  description: z.string().max(200).optional(),
   archived: z.boolean().default(false),
 });
 export type MetricDef = z.infer<typeof MetricDef>;
@@ -87,8 +88,10 @@ export type Row = z.infer<typeof Row>;
 export const LogEvent = z.object({
   id: EventId,
   date: z.string(),
+  // Empty string = not yet assigned to a metric (freshly added, blank row).
   metric: MetricId,
-  value: z.number(),
+  // null = value not yet filled in (freshly added, blank row).
+  value: z.number().nullable(),
   note: z.string().optional(),
 });
 export type LogEvent = z.infer<typeof LogEvent>;

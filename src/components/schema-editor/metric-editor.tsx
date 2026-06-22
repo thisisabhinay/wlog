@@ -29,6 +29,7 @@ export function MetricEditor({ open, onClose, existing }: Props) {
   const [direction, setDirection] = useState<Direction | ''>(existing?.direction ?? '');
   const [target, setTarget] = useState(existing?.target != null ? String(existing.target) : '');
   const [unit, setUnit] = useState(existing?.unit ?? '');
+  const [description, setDescription] = useState(existing?.description ?? '');
 
   const handleSave = () => {
     if (!label.trim() || !sheetId) return;
@@ -40,6 +41,7 @@ export function MetricEditor({ open, onClose, existing }: Props) {
       direction: direction || undefined,
       target: target ? parseFloat(target) : undefined,
       unit: unit || undefined,
+      description: description.trim() || undefined,
       archived: false,
     };
 
@@ -113,8 +115,19 @@ export function MetricEditor({ open, onClose, existing }: Props) {
             </div>
             <div>
               <Label>Unit</Label>
-              <Input value={unit} onChange={(e) => setUnit(e.target.value)} className="mt-1" placeholder="e.g. ms, %, h" />
+              <Input value={unit} onChange={(e) => setUnit(e.target.value)} className="mt-1" placeholder="e.g. seconds, percent, hours" />
             </div>
+          </div>
+          <div>
+            <Label>Description</Label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              maxLength={200}
+              className="mt-1 w-full px-2.5 py-1.5 text-sm border border-border rounded-md bg-transparent outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring/50 resize-none"
+              placeholder="What does this metric measure, and how is it counted?"
+            />
           </div>
         </div>
         <DialogFooter>

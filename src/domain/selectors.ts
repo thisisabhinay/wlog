@@ -34,7 +34,7 @@ const AGG: Record<string, (vals: number[]) => number | null> = {
 function bucketByMonth(log: LogEvent[], metricId: MetricId): Map<MonthKey, number[]> {
   const buckets = new Map<MonthKey, number[]>();
   for (const e of log) {
-    if (e.metric !== metricId) continue;
+    if (e.metric !== metricId || e.value == null) continue;
     const key = getMonthKey(e.date);
     const arr = buckets.get(key);
     if (arr) arr.push(e.value);
@@ -92,9 +92,9 @@ export function buildMatrixView(ws: Workspace, sheet: Extract<SheetDef, { kind: 
       return vals ? agg(vals) : null;
     });
 
-    const allVals = ws.log.filter((e) => e.metric === mId);
+    const allVals = ws.log.filter((e) => e.metric === mId && e.value != null);
     readingsLogged += allVals.length;
-    const allNums = allVals.map((e) => e.value);
+    const allNums = allVals.map((e) => e.value as number);
     const totalAgg = agg(allNums);
     totalActivity += totalAgg ?? 0;
 

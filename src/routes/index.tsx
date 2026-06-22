@@ -7,6 +7,7 @@ import { Button } from '#components/ui/button';
 import { Input } from '#components/ui/input';
 import { commands } from '#domain/commands';
 import { eventId } from '#domain/id';
+import type { MetricId } from '#domain/schema';
 
 export function OverviewPage() {
   const { workspace, run } = useDoc();
@@ -18,11 +19,13 @@ export function OverviewPage() {
 
   const handleAdd = () => {
     if (activeMetrics.length === 0) return;
+    // Start blank so it's clearly a new row to fill in — only the date is
+    // pre-filled with today. Sorted by date desc, so it lands at the top.
     const event = {
       id: eventId(),
       date: new Date().toISOString().slice(0, 10),
-      metric: activeMetrics[0].id,
-      value: 0,
+      metric: '' as MetricId,
+      value: null,
       note: '',
     };
     run(commands.logEvent(event));
