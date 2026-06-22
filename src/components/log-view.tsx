@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { Trash2, CalendarPlus, Plus, ChevronDown, Search } from 'lucide-react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -7,69 +7,26 @@ import { Button } from '#components/ui/button';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '#components/ui/popover';
-import { useDoc, useDocStore } from '#store/use-doc';
+import { useDoc } from '#store/use-doc';
 import { commands } from '#domain/commands';
 import { EmptyState } from '#components/empty-state';
-import { ColumnHeaderWithTooltip, type SortState } from '#components/column-header-tooltip';
-import { TruncatedText } from '#components/truncated-text';
+import { ColumnHeaderWithTooltip } from '#components/column-header-tooltip';
 import type { MetricId, EventId } from '#domain/schema';
 
 const LOG_COLUMNS = [
-  { id: 'log_date', label: 'Date' },
-  { id: 'log_metric', label: 'Metric' },
-  { id: 'log_sheet', label: 'Sheet' },
-  { id: 'log_value', label: 'Value' },
-  { id: 'log_unit', label: 'Unit' },
-  { id: 'log_agg', label: 'Aggregation' },
-  { id: 'log_note', label: 'Note' },
+  { id: 'log_date', label: 'Date', width: '15%' },
+  { id: 'log_metric', label: 'Metric', width: '35%' },
+  { id: 'log_value', label: 'Value', width: '15%' },
+  { id: 'log_note', label: 'Note', width: '30%' },
 ] as const;
-
-const DEFAULT_WIDTHS: Record<string, number> = {
-  log_date: 130,
-  log_metric: 180,
-  log_sheet: 140,
-  log_value: 80,
-  log_unit: 60,
-  log_agg: 110,
-  log_note: 200,
-};
 
 export function LogView({ search, onAdd }: { search: string; onAdd: () => void }) {
   const { workspace, run } = useDoc();
-  const setColumnWidth = useDocStore((s) => s.setColumnWidth);
-  const columnWidths = workspace.columnWidths ?? {};
   const activeMetrics = workspace.metrics.filter((m) => !m.archived);
-
-  const [sort, setSort] = useState<SortState>({ key: 'log_date', dir: 'desc' });
-
-  const toggleSort = (key: string) => {
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }
-    );
-  };
-
-  const getWidth = (colId: string) => columnWidths[`log:${colId}`] ?? DEFAULT_WIDTHS[colId];
-
-  const handleResizeStart = useCallback((colId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = getWidth(colId);
-    const onMove = (ev: MouseEvent) => {
-      const newWidth = Math.max(50, startWidth + ev.clientX - startX);
-      setColumnWidth(`log:${colId}`, newWidth);
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [columnWidths, setColumnWidth]);
 
   const entries = [...workspace.log];
 
   const getMetric = (id: MetricId) => workspace.metrics.find((m) => m.id === id);
-  const getSheet = (sheetId: string) => workspace.sheets.find((s) => s.id === sheetId);
 
   const filtered = search
     ? entries.filter((e) => {
@@ -83,35 +40,7 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
       })
     : entries;
 
-  const sorted = [...filtered].sort((a, b) => {
-    const dir = sort.dir === 'asc' ? 1 : -1;
-    switch (sort.key) {
-      case 'log_date': return dir * a.date.localeCompare(b.date);
-      case 'log_metric': {
-        const la = getMetric(a.metric)?.label ?? '';
-        const lb = getMetric(b.metric)?.label ?? '';
-        return dir * la.localeCompare(lb);
-      }
-      case 'log_sheet': {
-        const sa = getSheet(getMetric(a.metric)?.sheetId ?? '')?.name ?? '';
-        const sb = getSheet(getMetric(b.metric)?.sheetId ?? '')?.name ?? '';
-        return dir * sa.localeCompare(sb);
-      }
-      case 'log_value': return dir * (a.value - b.value);
-      case 'log_unit': {
-        const ua = getMetric(a.metric)?.unit ?? '';
-        const ub = getMetric(b.metric)?.unit ?? '';
-        return dir * ua.localeCompare(ub);
-      }
-      case 'log_agg': {
-        const aa = getMetric(a.metric)?.agg ?? '';
-        const ab = getMetric(b.metric)?.agg ?? '';
-        return dir * aa.localeCompare(ab);
-      }
-      case 'log_note': return dir * (a.note ?? '').localeCompare(b.note ?? '');
-      default: return 0;
-    }
-  });
+  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
 
   const handleEditField = (
     eId: EventId,
@@ -128,39 +57,21 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
     run(commands.deleteEvent(event, idx));
   };
 
-  const aggLabel = (agg: string) => {
-    switch (agg) {
-      case 'avg': return 'monthly average';
-      case 'sum': return 'monthly total';
-      case 'latest': return 'latest';
-      case 'min': return 'minimum';
-      case 'max': return 'maximum';
-      default: return agg;
-    }
-  };
-
   return (
     <div className="rounded-lg border border-border overflow-hidden">
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow className="bg-muted/50">
             {LOG_COLUMNS.map((col) => (
               <TableHead
                 key={col.id}
-                className="text-xs font-medium uppercase tracking-wider relative"
-                style={{ width: getWidth(col.id), minWidth: 50 }}
+                className="text-xs font-medium uppercase tracking-wider"
+                style={{ width: col.width }}
               >
-                <ColumnHeaderWithTooltip
-                  columnId={col.id}
-                  label={col.label}
-                  sort={sort}
-                  onSort={toggleSort}
-                  resizable
-                  onResizeStart={(e) => handleResizeStart(col.id, e)}
-                />
+                <ColumnHeaderWithTooltip columnId={col.id} label={col.label} />
               </TableHead>
             ))}
-            <TableHead className="w-10" />
+            <TableHead style={{ width: '5%' }} />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -176,12 +87,9 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
               </TableCell>
             </TableRow>
           ) : (
-            sorted.map((event) => {
-              const metric = getMetric(event.metric);
-              const sheet = metric ? getSheet(metric.sheetId) : null;
-              return (
+            sorted.map((event) => (
                 <TableRow key={event.id}>
-                  <TableCell className="p-0" style={{ width: getWidth('log_date') }}>
+                  <TableCell className="p-0">
                     <input
                       type="date"
                       className="w-full px-2 py-1.5 text-sm bg-transparent outline-none"
@@ -191,19 +99,14 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
                       }
                     />
                   </TableCell>
-                  <TableCell className="p-0" style={{ width: getWidth('log_metric') }}>
+                  <TableCell className="p-0">
                     <MetricPicker
                       value={event.metric}
                       metrics={activeMetrics}
                       onChange={(v) => handleEditField(event.id as EventId, 'metric', event, v)}
                     />
                   </TableCell>
-                  <TableCell className="px-2 py-1.5" style={{ width: getWidth('log_sheet') }}>
-                    <TruncatedText className="text-sm text-muted-foreground">
-                      {sheet?.name ?? '—'}
-                    </TruncatedText>
-                  </TableCell>
-                  <TableCell className="p-0" style={{ width: getWidth('log_value') }}>
+                  <TableCell className="p-0">
                     <input
                       type="number"
                       step="any"
@@ -214,17 +117,7 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
                       }
                     />
                   </TableCell>
-                  <TableCell className="px-2 py-1.5" style={{ width: getWidth('log_unit') }}>
-                    <span className="text-sm text-muted-foreground tabular-nums">
-                      {metric?.unit ?? '—'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-2 py-1.5" style={{ width: getWidth('log_agg') }}>
-                    <TruncatedText className="text-sm text-muted-foreground">
-                      {metric ? aggLabel(metric.agg) : '—'}
-                    </TruncatedText>
-                  </TableCell>
-                  <TableCell className="p-0" style={{ width: getWidth('log_note') }}>
+                  <TableCell className="p-0">
                     <input
                       className="w-full px-2 py-1.5 text-sm bg-transparent outline-none"
                       value={event.note ?? ''}
@@ -234,7 +127,7 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
                       }
                     />
                   </TableCell>
-                  <TableCell className="w-10">
+                  <TableCell>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -245,8 +138,7 @@ export function LogView({ search, onAdd }: { search: string; onAdd: () => void }
                     </Button>
                   </TableCell>
                 </TableRow>
-              );
-            })
+              ))
           )}
         </TableBody>
       </Table>
