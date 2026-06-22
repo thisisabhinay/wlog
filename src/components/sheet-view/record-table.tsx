@@ -114,7 +114,7 @@ export function RecordTable({
       <KpiCards kpis={kpis} />
 
       <div className="rounded-lg border border-border overflow-auto">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-10">

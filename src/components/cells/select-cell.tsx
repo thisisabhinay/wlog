@@ -41,23 +41,25 @@ export function SelectCell({ value, onCommit, options = [] }: CellProps<string>)
   }
 
   return (
-    <Select
-      open={open}
-      onOpenChange={setOpen}
-      value={current}
-      onValueChange={(v: string | null) => { if (v) { onCommit(v); setOpen(false); } }}
-    >
-      <SelectTrigger
-        className="h-8 text-sm border-ring"
-        onClick={() => setOpen(true)}
+    <div className="p-0.5">
+      <Select
+        open={open}
+        onOpenChange={setOpen}
+        value={current}
+        onValueChange={(v: string | null) => { if (v) { onCommit(v); setOpen(false); } }}
       >
-        <SelectValue placeholder="Select..." />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+        <SelectTrigger
+          className="h-8 text-sm border-ring"
+          onClick={() => setOpen(true)}
+        >
+          <SelectValue placeholder="Select..." />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
