@@ -115,7 +115,7 @@ export function MetricDetailPanel({
     .filter((e) => e.metric === metricId)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const values = events.map((e) => e.value);
+  const values = events.map((e) => e.value).filter((v): v is number => v != null);
   const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
   const latest = values.length ? values[0] : null;
 
@@ -125,6 +125,7 @@ export function MetricDetailPanel({
 
   const byMonth = new Map<string, number[]>();
   for (const e of events) {
+    if (e.value == null) continue;
     const key = getMonthKey(e.date);
     const arr = byMonth.get(key);
     if (arr) arr.push(e.value);
@@ -220,7 +221,7 @@ export function MetricDetailPanel({
                   <div key={e.id} className="flex items-center justify-between py-1.5 text-sm">
                     <span className="text-muted-foreground tabular-nums">{formatDate(e.date)}</span>
                     <span className="font-medium tabular-nums">
-                      {formatValue(e.value)}
+                      {e.value == null ? '—' : formatValue(e.value)}
                       {metric.unit ? ` ${metric.unit}` : ''}
                     </span>
                   </div>
