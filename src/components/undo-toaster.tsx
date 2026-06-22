@@ -17,10 +17,14 @@ export function UndoListener() {
       const len = past.length;
       if (len > prevLen.current) {
         const cmd = past[len - 1];
-        toast.success(cmd.label, {
-          action: { label: 'Undo', onClick: () => undo() },
-          duration: 4000,
-        });
+        // Continuous edits (cell/field typing) are silent — the header save
+        // status reflects them instead of spamming a toast per keystroke.
+        if (!cmd.silent) {
+          toast.success(cmd.label, {
+            action: { label: 'Undo', onClick: () => undo() },
+            duration: 4000,
+          });
+        }
       }
       prevLen.current = len;
     });

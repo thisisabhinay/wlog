@@ -4,6 +4,11 @@ import { serialize, openEnvelope, type OpenResult } from '#domain/envelope';
 import type { PersistencePort } from './port';
 
 export class DownloadUploadAdapter implements PersistencePort {
+  // Each save triggers a browser download prompt, so silent auto-save isn't possible.
+  canAutoSave(): boolean {
+    return false;
+  }
+
   async save(doc: Doc): Promise<Result<void>> {
     return this.saveAs(doc);
   }

@@ -2,6 +2,8 @@ import type { Workspace, SheetDef, MetricDef, ColumnDef, Row, LogEvent, SheetId,
 
 export interface Command {
   readonly label: string;
+  /** Continuous edits (cell/field typing) set this to suppress per-keystroke toasts. */
+  readonly silent?: boolean;
   do(ws: Workspace): Workspace;
   undo(ws: Workspace): Workspace;
 }
@@ -39,6 +41,7 @@ export const commands = {
     });
     return {
       label: 'Edit cell',
+      silent: true,
       do: (ws) => apply(ws, newValue),
       undo: (ws) => apply(ws, oldValue),
     };
@@ -64,7 +67,7 @@ export const commands = {
 
   logEvent(event: LogEvent): Command {
     return {
-      label: `Log ${event.value}`,
+      label: 'Add log entry',
       do: (ws) => ({ ...ws, log: [...ws.log, event] }),
       undo: (ws) => ({ ...ws, log: ws.log.filter((e) => e.id !== event.id) }),
     };
@@ -73,6 +76,7 @@ export const commands = {
   editEvent(eventId: EventId, oldEvent: LogEvent, newEvent: LogEvent): Command {
     return {
       label: 'Edit log entry',
+      silent: true,
       do: (ws) => ({ ...ws, log: ws.log.map((e) => (e.id === eventId ? newEvent : e)) }),
       undo: (ws) => ({ ...ws, log: ws.log.map((e) => (e.id === eventId ? oldEvent : e)) }),
     };

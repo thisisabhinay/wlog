@@ -6,4 +6,6 @@ export interface PersistencePort {
   save(doc: Doc): Promise<Result<void>>;
   saveAs(doc: Doc): Promise<Result<void>>;
   open(): Promise<OpenResult>;
+  /** True when the adapter can persist silently to a known target (no user prompt). */
+  canAutoSave(): boolean;
 }

@@ -10,10 +10,14 @@ interface UndoState {
   future: Command[];
 }
 
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 interface DocState {
   doc: Doc;
   undoStates: Record<string, UndoState>;
   isDirty: boolean;
+  saveStatus: SaveStatus;
+  setSaveStatus: (status: SaveStatus) => void;
 
   run: (cmd: Command) => void;
   undo: () => void;
@@ -46,6 +50,8 @@ export const useDocStore = create<DocState>()(
       doc: createStarter(),
       undoStates: {},
       isDirty: false,
+      saveStatus: 'idle',
+      setSaveStatus: (status) => set({ saveStatus: status }),
 
       run: (cmd: Command) => {
         set((state) => {

@@ -10,6 +10,10 @@ const FILE_OPTS = {
 export class FileSystemAccessAdapter implements PersistencePort {
   private handle: FileSystemFileHandle | null = null;
 
+  canAutoSave(): boolean {
+    return this.handle !== null;
+  }
+
   async save(doc: Doc): Promise<Result<void>> {
     if (!this.handle) return this.saveAs(doc);
     try {
