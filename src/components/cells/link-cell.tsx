@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
-import { TruncatedText } from '#components/truncated-text';
 import type { CellProps } from './cell-types';
 
 export function LinkCell({ value, onCommit, onCancel }: CellProps<string>) {

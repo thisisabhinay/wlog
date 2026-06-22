@@ -11,7 +11,7 @@ export function TruncatedText({
   children: string;
   className?: string;
 }) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
 
   const handleMouseEnter = () => {

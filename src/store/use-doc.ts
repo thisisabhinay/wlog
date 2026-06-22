@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Doc, Workspace, WorkspaceId, WorkspaceTemplate } from '#domain/schema';
+import type { Doc, WorkspaceId, WorkspaceTemplate } from '#domain/schema';
 import type { Command } from '#domain/commands';
 import { createStarter, createWorkspaceFromTemplate } from '#domain/starter';
 import { workspaceId as genWsId } from '#domain/id';

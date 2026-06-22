@@ -3,7 +3,7 @@ import { Button } from '#components/ui/button';
 import { Badge } from '#components/ui/badge';
 import { Separator } from '#components/ui/separator';
 import { useDoc } from '#store/use-doc';
-import { getMonthKey, formatMonthLabel } from '#domain/selectors';
+import { getMonthKey } from '#domain/selectors';
 import type { MetricId } from '#domain/schema';
 
 const METRIC_DETAILS: Record<string, { description: string; examples: string[]; tip: string }> = {
