@@ -1,7 +1,7 @@
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import {
   CalendarCheck, Trophy, HeartPulse, BarChart3, Medal, Users, ClipboardCheck,
-  BookOpen, Save, FolderOpen, Undo2, Redo2,
+  BookOpen, Save, FolderOpen, Undo2, Redo2, Settings,
 } from 'lucide-react';
 import { useDoc, useDocStore } from '#store/use-doc';
 import { usePersistence, useAutoSave } from '#persistence/use-persistence';
@@ -23,7 +23,7 @@ const SHEET_ICONS: Record<string, typeof CalendarCheck> = {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { workspace, undo, redo, canUndo, canRedo } = useDoc();
-  const { save, open, isDirty, autoSaveReady } = usePersistence();
+  const { save, open, reconnect, isDirty, autoSaveReady, needsReconnect } = usePersistence();
   const saveStatus = useDocStore((s) => s.saveStatus);
   const matchRoute = useMatchRoute();
   const activeSheets = workspace.sheets.filter((s) => !s.archived);
@@ -34,8 +34,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   // the one-time save that turns it on.
   const needsFirstSave = isDirty && !autoSaveReady && saveStatus !== 'saving';
 
-  const indicator =
-    saveStatus === 'saving'
+  // A folder linked in a previous session needs the user to re-grant access
+  // (browsers downgrade the permission to "prompt" across reloads). One click
+  // re-attaches it — no folder re-pick — and pulls in other devices' changes.
+  const indicator = needsReconnect
+    ? { text: 'Reconnect sync', dot: 'bg-amber-500', fg: 'text-amber-600', title: 'Re-grant access to your sync folder to resume saving and pull changes from other devices.' }
+    : saveStatus === 'saving'
       ? { text: 'Saving…', dot: 'bg-amber-500 animate-pulse', fg: 'text-amber-600', title: 'Auto-saving to your file…' }
       : saveStatus === 'error'
         ? { text: 'Save failed', dot: 'bg-red-500', fg: 'text-red-600', title: 'Could not write to the file. Click to retry.' }
@@ -54,9 +58,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </h1>
           <button
             type="button"
-            onClick={() => { void save(); }}
+            onClick={() => { void (needsReconnect ? reconnect() : save()); }}
             title={indicator.title}
-            className={`inline-flex items-center gap-1 text-xs ${indicator.fg} ${needsFirstSave || saveStatus === 'error' ? 'cursor-pointer hover:underline' : 'cursor-default'}`}
+            className={`inline-flex items-center gap-1 text-xs ${indicator.fg} ${needsReconnect || needsFirstSave || saveStatus === 'error' ? 'cursor-pointer hover:underline' : 'cursor-default'}`}
           >
             <span className={`inline-block h-1.5 w-1.5 rounded-full ${indicator.dot} shrink-0`} />
             {indicator.text}
@@ -92,6 +96,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               />
             );
           })}
+          <Separator className="my-2" />
+          <NavItem to="/settings" label="Settings" icon={Settings} active={!!matchRoute({ to: '/settings' })} />
         </nav>
 
         <div className="border-t border-border p-2">
