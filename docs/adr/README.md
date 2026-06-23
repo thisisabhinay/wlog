@@ -18,4 +18,5 @@ to reflect current status.
 | [0010](0010-auto-save-to-linked-file.md) | Auto-save to the linked file | Accepted — whole-blob write superseded by 0013 |
 | [0011](0011-blank-by-default-records-and-null-values.md) | Blank-by-default records and null values | Accepted |
 | [0012](0012-metric-metadata-units-and-descriptions.md) | Metric metadata: units and descriptions | Accepted |
-| [0013](0013-multi-device-sync-via-folder-of-per-device-automerge-files.md) | Multi-device sync via a folder of per-device Automerge files | Accepted |
+| [0013](0013-multi-device-sync-via-folder-of-per-device-automerge-files.md) | Multi-device sync via a folder of per-device Automerge files | Accepted — identity & handle details amended by 0014 |
+| [0014](0014-persisted-folder-handle-and-per-folder-device-identity.md) | Persisted folder handle and per-folder device identity | Accepted |
