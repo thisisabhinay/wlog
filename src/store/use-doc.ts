@@ -18,6 +18,9 @@ interface DocState {
   isDirty: boolean;
   saveStatus: SaveStatus;
   setSaveStatus: (status: SaveStatus) => void;
+  /** A previously-linked sync folder needs the user to re-grant access. */
+  needsReconnect: boolean;
+  setNeedsReconnect: (v: boolean) => void;
 
   run: (cmd: Command) => void;
   undo: () => void;
@@ -52,6 +55,8 @@ export const useDocStore = create<DocState>()(
       isDirty: false,
       saveStatus: 'idle',
       setSaveStatus: (status) => set({ saveStatus: status }),
+      needsReconnect: false,
+      setNeedsReconnect: (v) => set({ needsReconnect: v }),
 
       run: (cmd: Command) => {
         set((state) => {

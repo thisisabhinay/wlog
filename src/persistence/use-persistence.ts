@@ -16,6 +16,9 @@ export function usePersistence() {
   const isDirty = useDocStore((s) => s.isDirty);
   const setDoc = useDocStore((s) => s.setDoc);
   const markClean = useDocStore((s) => s.markClean);
+  const needsReconnect = useDocStore((s) => s.needsReconnect);
+  const setNeedsReconnect = useDocStore((s) => s.setNeedsReconnect);
+  const setSaveStatus = useDocStore((s) => s.setSaveStatus);
 
   const save = useCallback(async () => {
     const result = await adapter.save(doc);
@@ -25,15 +28,38 @@ export function usePersistence() {
 
   const saveAs = useCallback(async () => {
     const result = await adapter.saveAs(doc);
-    if (result.ok) markClean();
+    if (result.ok) {
+      markClean();
+      setNeedsReconnect(false);
+    }
     return result;
-  }, [doc, markClean]);
+  }, [doc, markClean, setNeedsReconnect]);
 
   const open = useCallback(async () => {
     const result = await adapter.open();
     if (result.ok) setDoc(result.doc);
+    setNeedsReconnect(false);
     return result;
-  }, [setDoc]);
+  }, [setDoc, setNeedsReconnect]);
+
+  // Re-grant access to a folder linked in a previous session (one user gesture,
+  // no folder re-pick), then pull in everything that changed while we were away.
+  const reconnect = useCallback(async () => {
+    const result = await adapter.reconnect();
+    if (result.status === 'ready') {
+      setNeedsReconnect(false);
+      if (result.doc) setDoc(result.doc);
+    }
+    return result;
+  }, [setDoc, setNeedsReconnect]);
+
+  // Forget the linked folder. Your data stays in the store (and the folder's
+  // files stay on disk); the next save/open starts a fresh link.
+  const forget = useCallback(async () => {
+    await adapter.forget();
+    setNeedsReconnect(false);
+    setSaveStatus('idle'); // also nudges a re-render so autoSaveReady recomputes
+  }, [setNeedsReconnect, setSaveStatus]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -45,13 +71,13 @@ export function usePersistence() {
 
   return useMemo(
     () => ({
-      save, saveAs, open, isDirty,
+      save, saveAs, open, reconnect, forget, isDirty, needsReconnect,
       hasFolderSync: supportsDirectoryAccess(),
       // Whether silent auto-save has a file target yet. Recomputed each render;
       // the transitions that flip it (open/save) all trigger a re-render.
       autoSaveReady: adapter.canAutoSave(),
     }),
-    [save, saveAs, open, isDirty]
+    [save, saveAs, open, reconnect, forget, isDirty, needsReconnect]
   );
 }
 
@@ -67,6 +93,26 @@ export function useAutoSave() {
   const isDirty = useDocStore((s) => s.isDirty);
   const markClean = useDocStore((s) => s.markClean);
   const setSaveStatus = useDocStore((s) => s.setSaveStatus);
+  const setDoc = useDocStore((s) => s.setDoc);
+  const setNeedsReconnect = useDocStore((s) => s.setNeedsReconnect);
+
+  // On startup, re-attach the folder linked in a previous session so the user
+  // doesn't re-pick it every reload, and pull in changes from other devices.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const result = await adapter.restore();
+      if (cancelled) return;
+      if (result.status === 'ready') {
+        if (result.doc) setDoc(result.doc);
+      } else if (result.status === 'needs-permission') {
+        setNeedsReconnect(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setDoc, setNeedsReconnect]);
 
   useEffect(() => {
     if (!isDirty || !adapter.canAutoSave()) return;
