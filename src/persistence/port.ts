@@ -21,4 +21,6 @@ export interface PersistencePort {
   reconnect(): Promise<RestoreResult>;
   /** Forget the linked folder so the next save/open starts a fresh link. */
   forget(): Promise<void>;
+  /** Device files that couldn't be read on the last load (placeholders/corrupt). */
+  lastUnreadableCount(): number;
 }

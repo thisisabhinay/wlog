@@ -15,3 +15,13 @@ export function newDeviceFileName(): string {
 export function isDeviceFile(name: string): boolean {
   return name.startsWith(FILE_PREFIX) && name.endsWith(FILE_SUFFIX);
 }
+
+/**
+ * True for a not-yet-downloaded iCloud placeholder of a device file. macOS
+ * represents an evicted file `device-<id>.wlg` as a hidden `.device-<id>.wlg.icloud`
+ * stub, which can't be read — we count these so the UI can warn instead of
+ * silently merging incomplete data. See ADR 0015.
+ */
+export function isDeviceFilePlaceholder(name: string): boolean {
+  return name.endsWith('.icloud') && name.includes(FILE_PREFIX) && name.includes(FILE_SUFFIX);
+}

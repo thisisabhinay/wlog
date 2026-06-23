@@ -19,6 +19,9 @@ export class DownloadUploadAdapter implements PersistencePort {
   async forget(): Promise<void> {
     // No persistent link in the download/upload fallback.
   }
+  lastUnreadableCount(): number {
+    return 0;
+  }
 
   async save(doc: Doc): Promise<Result<void>> {
     return this.saveAs(doc);

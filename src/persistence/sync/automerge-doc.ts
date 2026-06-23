@@ -7,29 +7,60 @@ import { reconcile } from './reconcile';
 export type SyncDoc = Automerge.Doc<Doc>;
 
 /**
- * Create the shared base document from a plain `Doc`. Only the FIRST device to
- * use a folder should call this; every other device must `loadAndMerge` the
- * folder's existing files so their history branches from the same root (two
- * independent `from()` calls on the same content would not share lineage and
- * could duplicate top-level items on merge). See ADR 0013.
+ * A fixed, content-free genesis change that EVERY device shares. Because the
+ * actor, timestamp, and ops are constant, every device produces the identical
+ * genesis change (same hash), so all device docs descend from a common
+ * ancestor. Without this, two devices each calling `Automerge.from()` would
+ * have disjoint histories and `merge` would pick one side's whole subtree as
+ * the winner — silently discarding the other device's data (the "each device
+ * only sees its own data" bug). See ADR 0014.
+ *
+ * IMMUTABLE: these values must never change, or devices on different app
+ * versions would compute different genesis hashes and stop sharing lineage.
  */
-export function fromPlain(plain: Doc): SyncDoc {
-  return Automerge.from(plain as Doc);
+const GENESIS_ACTOR = '00000000000000000000000000000001';
+
+function genesisDoc(): SyncDoc {
+  let doc = Automerge.init<Doc>({ actor: GENESIS_ACTOR });
+  doc = Automerge.change(doc, { time: 0, message: 'genesis' }, (d) => {
+    const draft = d as Record<string, unknown>;
+    draft.meta = { schemaVersion: 0, appVersion: 'genesis' };
+    draft.activeWorkspaceId = '';
+    draft.workspaces = [];
+  });
+  return doc;
 }
 
-/** Load and merge every device file into one document. Returns null if empty. */
-export function loadAndMerge(files: Uint8Array[]): SyncDoc | null {
+/**
+ * Seed this device's Automerge doc from a plain `Doc`, branching from the shared
+ * genesis so it merges losslessly with every other device. The branch gets a
+ * unique actor id for this device's ongoing changes. See ADR 0014.
+ */
+export function fromPlain(plain: Doc): SyncDoc {
+  const actor = crypto.randomUUID().replace(/-/g, '');
+  const base = Automerge.clone(genesisDoc(), { actor });
+  return applyPlain(base, plain);
+}
+
+/**
+ * Load and merge every device file into one document. `failed` counts files
+ * that couldn't be parsed (corrupt/partial) so the caller can warn rather than
+ * silently merge incomplete data. `doc` is null when nothing loaded.
+ */
+export function loadAndMerge(files: Uint8Array[]): { doc: SyncDoc | null; failed: number } {
   let merged: SyncDoc | null = null;
+  let failed = 0;
   for (const bytes of files) {
     let loaded: SyncDoc;
     try {
       loaded = Automerge.load<Doc>(bytes);
     } catch {
-      continue; // skip a corrupt/partial file rather than failing the whole open
+      failed++;
+      continue;
     }
     merged = merged === null ? loaded : Automerge.merge(merged, loaded);
   }
-  return merged;
+  return { doc: merged, failed };
 }
 
 /** Fold this device's current plain state into the Automerge doc as one change. */

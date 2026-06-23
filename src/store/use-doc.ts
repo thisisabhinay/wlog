@@ -21,6 +21,9 @@ interface DocState {
   /** A previously-linked sync folder needs the user to re-grant access. */
   needsReconnect: boolean;
   setNeedsReconnect: (v: boolean) => void;
+  /** Count of device files that couldn't be read on the last folder load. */
+  syncIssues: number;
+  setSyncIssues: (n: number) => void;
 
   run: (cmd: Command) => void;
   undo: () => void;
@@ -57,6 +60,8 @@ export const useDocStore = create<DocState>()(
       setSaveStatus: (status) => set({ saveStatus: status }),
       needsReconnect: false,
       setNeedsReconnect: (v) => set({ needsReconnect: v }),
+      syncIssues: 0,
+      setSyncIssues: (n) => set({ syncIssues: n }),
 
       run: (cmd: Command) => {
         set((state) => {

@@ -99,7 +99,7 @@ function Section({
 
 function SyncSection() {
   const doc = useDocStore((s) => s.doc);
-  const { save, saveAs, open, reconnect, forget, isDirty, needsReconnect, hasFolderSync, autoSaveReady } = usePersistence();
+  const { save, saveAs, open, reconnect, forget, isDirty, needsReconnect, syncIssues, hasFolderSync, autoSaveReady } = usePersistence();
 
   const handleForget = async () => {
     if (confirm('Forget the linked sync folder?\n\nYour data stays in this browser and the folder’s files are left untouched on disk. You’ll need to link a folder again to resume syncing.')) {
@@ -136,6 +136,16 @@ function SyncSection() {
             <Button size="sm" variant="outline" onClick={() => reconnect()}>
               <RefreshCw className="mr-1 h-3.5 w-3.5" /> Reconnect
             </Button>
+          </div>
+        )}
+
+        {syncIssues > 0 && (
+          <div className="flex items-start gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {syncIssues} device file{syncIssues === 1 ? '' : 's'} couldn’t be read — likely not downloaded
+              from the cloud yet. Those changes aren’t merged. Once iCloud finishes downloading, click Open again.
+            </span>
           </div>
         )}
 

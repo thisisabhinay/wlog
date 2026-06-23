@@ -2,7 +2,7 @@ import type { Doc } from '#domain/schema';
 import type { Result } from '#domain/result';
 import type { OpenResult } from '#domain/envelope';
 import type { PersistencePort, RestoreResult } from './port';
-import { newDeviceFileName, isDeviceFile } from './sync/device-id';
+import { newDeviceFileName, isDeviceFile, isDeviceFilePlaceholder } from './sync/device-id';
 import { getLinkedFolder, setLinkedFolder, clearLinkedFolder } from './sync/handle-store';
 import {
   fromPlain,
@@ -28,9 +28,15 @@ export class DirectoryAdapter implements PersistencePort {
   private fileName: string | null = null;
   /** This device's Automerge doc — the merged baseline plus our local edits. */
   private syncDoc: SyncDoc | null = null;
+  /** Device files that couldn't be read on the last load (placeholders/corrupt). */
+  private lastUnreadable = 0;
 
   canAutoSave(): boolean {
     return this.dir !== null && this.fileName !== null;
+  }
+
+  lastUnreadableCount(): number {
+    return this.lastUnreadable;
   }
 
   /** Re-attach the folder linked in a previous session, if any. */
@@ -102,7 +108,8 @@ export class DirectoryAdapter implements PersistencePort {
 
     // Linking a folder that already holds data: merge it in so neither the
     // on-disk history nor our in-memory edits are lost.
-    this.syncDoc = loadAndMerge(await readDeviceFiles(dir));
+    const { bytes } = await readDeviceFiles(dir);
+    this.syncDoc = loadAndMerge(bytes).doc;
     await this.adoptDir(dir);
     return this.save(doc);
   }
@@ -126,7 +133,9 @@ export class DirectoryAdapter implements PersistencePort {
   /** Read+merge all device files in the current dir into `syncDoc`. */
   private async loadCurrent(): Promise<RestoreResult> {
     if (!this.dir) return { status: 'none' };
-    const merged = loadAndMerge(await readDeviceFiles(this.dir));
+    const { bytes, unreadable } = await readDeviceFiles(this.dir);
+    const { doc: merged, failed } = loadAndMerge(bytes);
+    this.lastUnreadable = unreadable + failed;
     if (merged === null) {
       this.syncDoc = null;
       return { status: 'ready' }; // empty folder — caller keeps its current doc
@@ -175,15 +184,26 @@ async function fileExists(dir: FileSystemDirectoryHandle, name: string): Promise
   }
 }
 
-async function readDeviceFiles(dir: FileSystemDirectoryHandle): Promise<Uint8Array[]> {
-  const out: Uint8Array[] = [];
+async function readDeviceFiles(
+  dir: FileSystemDirectoryHandle,
+): Promise<{ bytes: Uint8Array[]; unreadable: number }> {
+  const bytes: Uint8Array[] = [];
+  let unreadable = 0;
   for await (const entry of dir.values()) {
-    if (entry.kind === 'file' && isDeviceFile(entry.name)) {
+    if (entry.kind !== 'file') continue;
+    if (isDeviceFilePlaceholder(entry.name)) {
+      unreadable++; // an evicted iCloud file that hasn't downloaded yet
+      continue;
+    }
+    if (!isDeviceFile(entry.name)) continue;
+    try {
       const file = await (entry as FileSystemFileHandle).getFile();
-      out.push(new Uint8Array(await file.arrayBuffer()));
+      bytes.push(new Uint8Array(await file.arrayBuffer()));
+    } catch {
+      unreadable++;
     }
   }
-  return out;
+  return { bytes, unreadable };
 }
 
 async function isSameEntry(a: FileSystemDirectoryHandle, b: FileSystemDirectoryHandle): Promise<boolean> {
