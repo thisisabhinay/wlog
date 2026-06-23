@@ -19,6 +19,8 @@ export interface PersistencePort {
   restore(): Promise<RestoreResult>;
   /** Re-grant access to the restored folder via a user gesture, then load it. */
   reconnect(): Promise<RestoreResult>;
+  /** Re-read+merge an already-linked folder (no prompt) to pull others' writes. */
+  refresh(): Promise<RestoreResult>;
   /** Forget the linked folder so the next save/open starts a fresh link. */
   forget(): Promise<void>;
   /** Device files that couldn't be read on the last load (placeholders/corrupt). */

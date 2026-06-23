@@ -25,6 +25,42 @@ const adapter: PersistencePort = supportsDirectoryAccess()
   ? new DirectoryAdapter()
   : new DownloadUploadAdapter();
 
+interface PullDeps {
+  setDoc: (doc: ReturnType<typeof useDocStore.getState>['doc']) => void;
+  markClean: () => void;
+  setNeedsReconnect: (v: boolean) => void;
+  setSyncIssues: (n: number) => void;
+}
+
+let pulling = false;
+
+/**
+ * Flush this device's edits to its file, then re-read and merge the whole
+ * folder so other devices' writes are pulled in. Used by the manual "Sync now"
+ * action and the on-focus auto-sync. No-op unless a folder is linked. Guarded
+ * against overlapping runs. With the shared genesis (ADR 0015) the merge unions
+ * losslessly, so flushing-then-merging never drops this device's edits.
+ */
+async function flushAndPull(deps: PullDeps, notify: boolean): Promise<void> {
+  if (pulling || !adapter.canAutoSave()) return;
+  pulling = true;
+  try {
+    const current = useDocStore.getState().doc;
+    const saved = await adapter.save(current);
+    if (saved.ok) deps.markClean();
+    const result = await adapter.refresh();
+    if (result.status === 'ready') {
+      deps.setNeedsReconnect(false);
+      if (result.doc) deps.setDoc(result.doc);
+    } else if (result.status === 'needs-permission') {
+      deps.setNeedsReconnect(true);
+    }
+    reportSyncIssues(deps.setSyncIssues, notify);
+  } finally {
+    pulling = false;
+  }
+}
+
 export function usePersistence() {
   const doc = useDocStore((s) => s.doc);
   const isDirty = useDocStore((s) => s.isDirty);
@@ -70,6 +106,13 @@ export function usePersistence() {
     return result;
   }, [setDoc, setNeedsReconnect, setSyncIssues]);
 
+  // Manual "Sync now": flush our edits, then pull+merge the folder so other
+  // devices' latest writes appear without a full reload.
+  const syncNow = useCallback(
+    () => flushAndPull({ setDoc, markClean, setNeedsReconnect, setSyncIssues }, true),
+    [setDoc, markClean, setNeedsReconnect, setSyncIssues],
+  );
+
   // Forget the linked folder. Your data stays in the store (and the folder's
   // files stay on disk); the next save/open starts a fresh link.
   const forget = useCallback(async () => {
@@ -91,13 +134,13 @@ export function usePersistence() {
 
   return useMemo(
     () => ({
-      save, saveAs, open, reconnect, forget, isDirty, needsReconnect, syncIssues,
+      save, saveAs, open, reconnect, forget, syncNow, isDirty, needsReconnect, syncIssues,
       hasFolderSync: supportsDirectoryAccess(),
       // Whether silent auto-save has a file target yet. Recomputed each render;
       // the transitions that flip it (open/save) all trigger a re-render.
       autoSaveReady: adapter.canAutoSave(),
     }),
-    [save, saveAs, open, reconnect, forget, isDirty, needsReconnect, syncIssues]
+    [save, saveAs, open, reconnect, forget, syncNow, isDirty, needsReconnect, syncIssues]
   );
 }
 
@@ -135,6 +178,22 @@ export function useAutoSave() {
       cancelled = true;
     };
   }, [setDoc, setNeedsReconnect, setSyncIssues]);
+
+  // Pull in other devices' writes whenever this tab regains focus, so an
+  // already-open device converges without a manual reload. Flushes local edits
+  // first; the shared genesis (ADR 0015) makes the merge a lossless union.
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState !== 'visible') return;
+      void flushAndPull({ setDoc, markClean, setNeedsReconnect, setSyncIssues }, false);
+    };
+    window.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [setDoc, markClean, setNeedsReconnect, setSyncIssues]);
 
   useEffect(() => {
     if (!isDirty || !adapter.canAutoSave()) return;

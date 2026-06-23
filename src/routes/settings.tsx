@@ -99,7 +99,11 @@ function Section({
 
 function SyncSection() {
   const doc = useDocStore((s) => s.doc);
-  const { save, saveAs, open, reconnect, forget, isDirty, needsReconnect, syncIssues, hasFolderSync, autoSaveReady } = usePersistence();
+  const { saveAs, open, reconnect, forget, syncNow, isDirty, needsReconnect, syncIssues, hasFolderSync, autoSaveReady } = usePersistence();
+  // `autoSaveReady` only means a folder is remembered; access may still be
+  // pending re-grant after a reload, so a folder is truly usable only when it's
+  // also not awaiting reconnect.
+  const linked = autoSaveReady && !needsReconnect;
 
   const handleForget = async () => {
     if (confirm('Forget the linked sync folder?\n\nYour data stays in this browser and the folder’s files are left untouched on disk. You’ll need to link a folder again to resume syncing.')) {
@@ -119,14 +123,16 @@ function SyncSection() {
     >
       <div className="rounded-lg border border-border p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm">
-          <span className={`inline-block h-2 w-2 rounded-full ${autoSaveReady ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
+          <span className={`inline-block h-2 w-2 rounded-full ${linked ? 'bg-emerald-500' : needsReconnect ? 'bg-amber-500' : 'bg-muted-foreground/40'}`} />
           <span className="font-medium">
-            {autoSaveReady ? 'Folder linked' : 'No folder linked'}
+            {linked ? 'Synced' : needsReconnect ? 'Reconnect required' : 'No folder linked'}
           </span>
           <span className="text-muted-foreground">
-            {autoSaveReady
-              ? '— changes save automatically'
-              : '— link a folder to enable auto-save and sync'}
+            {linked
+              ? '— changes save automatically and merge across devices'
+              : needsReconnect
+                ? '— re-grant access to resume syncing'
+                : '— link a folder to enable sync'}
           </span>
         </div>
 
@@ -144,15 +150,19 @@ function SyncSection() {
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               {syncIssues} device file{syncIssues === 1 ? '' : 's'} couldn’t be read — likely not downloaded
-              from the cloud yet. Those changes aren’t merged. Once iCloud finishes downloading, click Open again.
+              from the cloud yet. Those changes aren’t merged. Once iCloud finishes downloading, Sync now again.
             </span>
           </div>
         )}
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => save()}>Save now</Button>
+          {linked && (
+            <Button onClick={() => syncNow()}>
+              <RefreshCw className="mr-1 h-4 w-4" /> Sync now
+            </Button>
+          )}
           <Button variant="outline" onClick={() => saveAs()}>
-            {hasFolderSync ? 'Link folder…' : 'Save as…'}
+            {!hasFolderSync ? 'Save as…' : autoSaveReady ? 'Switch folder…' : 'Link folder…'}
           </Button>
           <Button variant="outline" onClick={() => open()}>Open…</Button>
         </div>

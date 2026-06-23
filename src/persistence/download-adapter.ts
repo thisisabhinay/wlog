@@ -16,6 +16,9 @@ export class DownloadUploadAdapter implements PersistencePort {
   async reconnect(): Promise<RestoreResult> {
     return { status: 'none' };
   }
+  async refresh(): Promise<RestoreResult> {
+    return { status: 'none' };
+  }
   async forget(): Promise<void> {
     // No persistent link in the download/upload fallback.
   }

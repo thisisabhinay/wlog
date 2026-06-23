@@ -68,6 +68,19 @@ export class DirectoryAdapter implements PersistencePort {
     return this.loadCurrent();
   }
 
+  /**
+   * Re-read and merge the folder for an already-linked device (no picker, no
+   * prompt) so an open tab pulls in other devices' latest writes. Signals
+   * needs-permission if the grant lapsed.
+   */
+  async refresh(): Promise<RestoreResult> {
+    if (!this.dir) return { status: 'none' };
+    if ((await queryPermission(this.dir)) !== 'granted') {
+      return { status: 'needs-permission' };
+    }
+    return this.loadCurrent();
+  }
+
   /** Forget the linked folder. The folder's files are left untouched on disk. */
   async forget(): Promise<void> {
     this.dir = null;
