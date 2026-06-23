@@ -1,12 +1,23 @@
 import type { Doc } from '#domain/schema';
 import type { Result } from '#domain/result';
 import { serialize, openEnvelope, type OpenResult } from '#domain/envelope';
-import type { PersistencePort } from './port';
+import type { PersistencePort, RestoreResult } from './port';
 
 export class DownloadUploadAdapter implements PersistencePort {
   // Each save triggers a browser download prompt, so silent auto-save isn't possible.
   canAutoSave(): boolean {
     return false;
+  }
+
+  // No persistent folder to re-attach in the download/upload fallback.
+  async restore(): Promise<RestoreResult> {
+    return { status: 'none' };
+  }
+  async reconnect(): Promise<RestoreResult> {
+    return { status: 'none' };
+  }
+  async forget(): Promise<void> {
+    // No persistent link in the download/upload fallback.
   }
 
   async save(doc: Doc): Promise<Result<void>> {
