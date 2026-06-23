@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDocStore } from '#store/use-doc';
-import { FileSystemAccessAdapter, supportsFileSystemAccess } from './fs-access-adapter';
+import { DirectoryAdapter, supportsDirectoryAccess } from './directory-adapter';
 import { DownloadUploadAdapter } from './download-adapter';
 import type { PersistencePort } from './port';
 
-const adapter: PersistencePort = supportsFileSystemAccess()
-  ? new FileSystemAccessAdapter()
+// Multi-device sync via a linked folder of per-device Automerge files (ADR 0013).
+// Browsers without the File System Access directory picker fall back to the
+// single-file download/upload flow (no cross-device merge — accepted degradation).
+const adapter: PersistencePort = supportsDirectoryAccess()
+  ? new DirectoryAdapter()
   : new DownloadUploadAdapter();
 
 export function usePersistence() {
@@ -43,7 +46,7 @@ export function usePersistence() {
   return useMemo(
     () => ({
       save, saveAs, open, isDirty,
-      hasFileSystemAccess: supportsFileSystemAccess(),
+      hasFolderSync: supportsDirectoryAccess(),
       // Whether silent auto-save has a file target yet. Recomputed each render;
       // the transitions that flip it (open/save) all trigger a re-render.
       autoSaveReady: adapter.canAutoSave(),
