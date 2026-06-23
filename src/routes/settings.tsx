@@ -12,7 +12,7 @@ import type { MetricId, WorkspaceId } from '#domain/schema';
 export function SettingsPage() {
   const { workspace, run } = useDoc();
   const resetToStarter = useDocStore((s) => s.resetToStarter);
-  const { save, saveAs, open, isDirty, hasFileSystemAccess } = usePersistence();
+  const { save, saveAs, open, isDirty, hasFolderSync } = usePersistence();
   const [showArchived, setShowArchived] = useState(false);
 
   const archivedSheets = workspace.sheets.filter((s) => !s.archived);
@@ -66,16 +66,18 @@ export function SettingsPage() {
       <Separator />
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">File</h2>
+        <h2 className="text-lg font-medium">Sync</h2>
         <p className="text-sm text-muted-foreground">
-          {hasFileSystemAccess
-            ? 'File System Access API available — save directly to a file.'
-            : 'Using download/upload fallback.'}
+          {hasFolderSync
+            ? 'Link a sync folder (e.g. inside iCloud Drive). Each device writes its own file there, and Open merges changes from every device without losing any. See ADR 0013.'
+            : 'This browser can’t link a folder — using download/upload fallback (no cross-device merge).'}
         </p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => save()}>Save</Button>
-          <Button variant="outline" onClick={() => saveAs()}>Save as...</Button>
-          <Button variant="outline" onClick={() => open()}>Open...</Button>
+          <Button variant="outline" onClick={() => saveAs()}>
+            {hasFolderSync ? 'Link folder…' : 'Save as…'}
+          </Button>
+          <Button variant="outline" onClick={() => open()}>Open…</Button>
         </div>
         {isDirty && <p className="text-xs text-amber-600">You have unsaved changes.</p>}
       </section>
